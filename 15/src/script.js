@@ -77,6 +77,7 @@ const spotLightHelper = new THREE.SpotLightHelper(spotLight)
 // This helper is not within the THREE class, you need to import it from /examples/
 const rectAreaLightHelper = new RectAreaLightHelper(rectAreaLight)
 scene.add(rectAreaLightHelper)
+//Tets git
 
 
 /**
