@@ -5,7 +5,6 @@ import { Clock } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
 // Comment lost in refactoring
-// The further from the centre, the faster the particle will spin
 
 // Instantiate a Clock for the whole function to later use it as a rotation reference
 const clock = new Clock()
@@ -40,7 +39,7 @@ const addResponsiveWindow = (sizesObject, camera, renderer) => {
         sizesObject.width = window.innerWidth
         sizesObject.height = window.innerHeight
 
-        // Update camera
+        // Update camera aspect ratio
         camera.aspect = sizesObject.width / sizesObject.height
         camera.updateProjectionMatrix()
 
@@ -51,14 +50,14 @@ const addResponsiveWindow = (sizesObject, camera, renderer) => {
 }
 
 const createRenderer = (sizesObject = windowSize) => {
-    const canvas = document.querySelector('canvas.webgl')
-    const renderer = new THREE.WebGLRenderer({ canvas })
-    renderer.setSize(sizesObject.width, sizesObject.height)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-
     const scene = new THREE.Scene()
     const camera = createCamera(scene)
+    const canvas = document.querySelector('canvas.webgl')
+    const renderer = new THREE.WebGLRenderer({ canvas })
     const controls = createControls(camera, canvas)
+
+    renderer.setSize(sizesObject.width, sizesObject.height)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     addResponsiveWindow(sizesObject, camera, renderer)
 
     return { scene, renderer, controls, camera }
@@ -76,64 +75,54 @@ const parameters = {
     outsideColor: '#1b3984',
 }
 
-const addGuiParameters = (parameters, refreshFunction) => {
+const createAppGUI = (parameters) => {
     const gui = new dat.GUI({ width: 500 })
 
-    // Here we add onFinishChange(callback) whenever the values on parameters are tweaked, regenerate the galaxy
     gui.add(parameters, 'count')
         .min(100)
         .max(1000000)
         .step(100)
-        .onFinishChange(refreshFunction)
 
     gui.add(parameters, 'size')
         .min(0.001)
         .max(0.1)
         .step(0.001)
-        .onFinishChange(refreshFunction)
 
     gui.add(parameters, 'radius')
         .min(0.01)
         .max(20)
         .step(0.01)
-        .onFinishChange(refreshFunction)
 
     gui.add(parameters, 'branches')
         .min(2)
         .max(20)
         .step(1)
-        .onFinishChange(refreshFunction)
 
     gui.add(parameters, 'spin')
         .min(- 5)
         .max(5)
         .step(1)
-        .onFinishChange(refreshFunction)
 
     gui.add(parameters, 'randomness')
         .min(0)
         .max(2)
         .step(0.01)
-        .onFinishChange(refreshFunction)
 
     gui.add(parameters, 'randomnessPower')
         .min(1)
         .max(10)
         .step(0.01)
-        .onFinishChange(refreshFunction)
 
     gui.addColor(parameters, 'insideColor')
         .min(1)
         .max(10)
         .step(0.01)
-        .onFinishChange(refreshFunction)
 
     gui.addColor(parameters, 'outsideColor')
         .min(1)
         .max(10)
         .step(0.01)
-        .onFinishChange(refreshFunction)
-
+    return gui
 }
 
 const destroyGalaxy = () => {
@@ -160,45 +149,91 @@ const mixColors = (parameters, radius) => {
     // so we create a clone to keep the original color
     const mixedColor = colorInside.clone()
 
-    // Review why are we dividing by the two radiuses
+    //! Review why are we dividing by the two radiuses
     return mixedColor.lerp(colorOutside, radius / parameters.radius)
 
 }
 
 const fillColorsArray = (colors, mixedColor, vertex) => {
-    //Fill the array for RGB. This is red
+    // Fill the buffered array for RGB.
+    // These are taken from the mix of the inside and outside
+    // colors in the parameters object
     colors[vertex] = mixedColor.r
     colors[vertex + 1] = mixedColor.g
     colors[vertex + 2] = mixedColor.b
 }
 
-const generateRandomCoords = (parameters) => {
-    const randomX = Math.pow(Math.random(), parameters.randomnessPower) * (Math.random() < 0.5 ? 1 : -1)
-    const randomY = Math.pow(Math.random(), parameters.randomnessPower) * (Math.random() < 0.5 ? 1 : -1)
-    const randomZ = Math.pow(Math.random(), parameters.randomnessPower) * (Math.random() < 0.5 ? 1 : -1)
+const generateRandomCoords = (parameters, radius) => {
+    const { randomnessPower } = parameters
+    const altitude = (Math.random() * 0.5 - radius)
+    const randomX = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1)
+    const randomY = Math.pow(Math.random(), randomnessPower) * ((Math.random() < 0.5 ? 1 : -1)) / altitude
+    const randomZ = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1)
 
     return { randomX, randomY, randomZ }
 }
 
 const generateBranchAngle = (index, parameters) => {
-    //* Review the explanation
-    return (index % parameters.branches) / parameters.branches * Math.PI * 2
+    const branchesAmount = parameters.branches
+    // Given that the array contains vertices stored in groups of 3 indexes...
+
+    // GET IN WHICH BRANCH DOES THE PARTICLE BELONG
+    // - We are going to target each vertex by substracting the modulo of
+    // the current index divided by the amount of branches selected by the user
+
+    // - It will point to the next one on the next vertex, until the iteration is done.
+
+    // - The result will never surpass the amount of branches, the result of the index will be
+    // at one point the same as the one of the amount of branches, thus returning the value
+    // to 0 and adding the particle to the branch 0 all over again
+
+    // example with 3 branches
+    // vertex 0 1 2 3 4 5 6 7 8 9 10 11
+    // branch 0 1 2 0 1 2 0 1 2 0 1  2
+
+    // GET THE ANGLE WHERE THE PARTICLE HAS TO BE PLACED (ANGLE OF THE BRANCH)
+    // We want the full circle of the galaxy to take the value 1.
+    // We then divide by the same branchesAmount to get a value from 0 to 1,
+    // each fraction corresponding to the radiant that will belong to each branch.
+    // That way we know the angle where the particle has to be placed.
+    // This is a decimal
+    const branchToTarget = (index % branchesAmount) / branchesAmount
+
+    // Default value to get the amount of radiants on a circle
+    const totalValueOfAllRadiants = Math.PI * 2
+
+    // The value of the full circle multiplied (actually divided) by the decimal number,
+    // We take a fraction from the total value.
+    const radiantToPlaceBranch = totalValueOfAllRadiants * branchToTarget 
+
+    return radiantToPlaceBranch
 }
 
-const generateSpinAngle = (radius, parameters) => {
-    return radius * parameters.spin
+const generateSpinAngle = (randomCoordsInRadius, parameters) => {
+    const staticSpinValue = parameters.spin 
+
+    // The coords will be higher the further they are from the center
+    // because the values on the centre are 0
+    // The further from the centre, the faster the particle will spin
+    return staticSpinValue * randomCoordsInRadius  
 }
 
-const fillPositionX = (totalAngle, radiusRandom) => {
-    return (Math.cos(totalAngle) * radiusRandom)
+const fillPositionX = (totalAngle, randomCoordsInRadius) => {
+    // 
+    return Math.cos(totalAngle) * randomCoordsInRadius
 }
 
-const fillPositionZ = (totalAngle, radiusRandom) => {
-    return (Math.sin(totalAngle) * radiusRandom)
+const fillPositionZ = (totalAngle, randomCoordsInRadius) => {
+    return Math.sin(totalAngle) * randomCoordsInRadius
 }
 
+const rotateGalaxy = (galaxy, elapsedTime) => {
+    galaxy.rotation.y = Math.PI * elapsedTime * 0.05
+    galaxy.rotation.x = 0.5
+}
 
 const generateGalaxy = () => {
+    const { count, radius } = parameters
 
     // Destroy old galaxy if it exists
     if (points !== null) {
@@ -207,31 +242,41 @@ const generateGalaxy = () => {
 
     // Assign to 2 Float32Arrays the length they will have, which is
     // the number of stars times the amount of vertices each one will hold
-    const positions = new Float32Array(parameters.count * 3)
-    const colors = new Float32Array(parameters.count * 3)
+    const positions = new Float32Array(count * 3)
+    const colors = new Float32Array(count * 3)
 
     // Add the vertices to the buffer geometry
-    for (let i = 0; i < parameters.count; i++) {
-        const vertex = i * 3
+    for (let i = 0; i < count; i++) {
 
-        // Position the particles randomly inside the values of the radius
-        const radius = Math.random() * parameters.radius
+        // The array contains vertices stored in groups of 3 indexes,
+        // which contain X - Y - Z values of the vertex
+        const vertexParticleX = i * 3
+        const vertexParticleY = vertexParticleX + 1
+        const vertexParticleZ = vertexParticleY + 1
 
-        const mixedColor = mixColors(parameters, radius)
-
-        fillColorsArray(colors, mixedColor, vertex)
+        // Get a random value between 0 and the length of
+        // the radius, where the particle will be positioned
+        const randomCoordsInRadius = Math.random() * radius
 
         const branchAngle = generateBranchAngle(i, parameters)
-        const spinAngle = generateSpinAngle(radius, parameters)
-        const totalAngle = branchAngle + spinAngle
+        const spinAngle = generateSpinAngle(randomCoordsInRadius, parameters)
 
-        const randomCoords = generateRandomCoords(parameters)
-        const radiusRandomX = radius + randomCoords.randomX
-        const radiusRandomZ = radius + randomCoords.randomZ 
+        // We make values that were placed further
+        // from the centre move inwards to give that speed effect
+        // We would substract if we wanted the branches to tend to the other direction 
+        const branchAngleWithSpin = branchAngle + spinAngle
 
-        positions[vertex] = fillPositionX(totalAngle, radiusRandomX)
-        positions[vertex + 1] = randomCoords.randomY
-        positions[vertex + 2] = fillPositionZ(totalAngle, radiusRandomZ)
+        const { randomX, randomY, randomZ } = generateRandomCoords(parameters, randomCoordsInRadius)
+        const radiusRandomX = randomX - randomCoordsInRadius
+        const radiusRandomZ = randomZ - randomCoordsInRadius
+
+        // This is just for one vertex
+        positions[vertexParticleX] = fillPositionX(branchAngleWithSpin, radiusRandomX)
+        positions[vertexParticleY] = randomY
+        positions[vertexParticleZ] = fillPositionZ(branchAngleWithSpin, radiusRandomZ)
+
+        const mixedColor = mixColors(parameters, randomCoordsInRadius)
+        fillColorsArray(colors, mixedColor, vertexParticleX)
     }
 
     // Assign the Buffer Geometry and the material
@@ -254,25 +299,22 @@ const generateGalaxy = () => {
     scene.add(points)
 }
 
-
-const { renderer, scene, controls, camera } = createRenderer()
-
-addGuiParameters(parameters, generateGalaxy)
-
-generateGalaxy()
-
-// Rotate galaxy
-const rotateGalaxy = (galaxy, time) => {
-    galaxy.rotation.y = Math.PI * time * 0.05
-    galaxy.rotation.x = 0.5
-}
-
-const tick = () => {
+const initApp = () => {
     const elapsedTime = clock.getElapsedTime()
     rotateGalaxy(points, elapsedTime)
     controls.update()
     renderer.render(scene, camera)
-    window.requestAnimationFrame(tick)
+    window.requestAnimationFrame(initApp)
 }
 
-tick()
+const { renderer, scene, controls, camera } = createRenderer()
+
+const gui = createAppGUI(parameters)
+
+// Here we add onFinishChange(callback) whenever the values on parameters are tweaked, 
+// regenerate the galaxy, so the tweaked values are not added onto the old ones
+gui.onFinishChange(generateGalaxy)
+
+generateGalaxy()
+
+initApp()
