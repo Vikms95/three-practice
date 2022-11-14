@@ -165,10 +165,17 @@ const fillColorsArray = (colors, mixedColor, vertex) => {
 
 const generateRandomCoords = (parameters, radius) => {
     const { randomnessPower } = parameters
-    const altitude = (Math.random() * 0.5 - radius)
-    const randomX = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1)
-    const randomY = Math.pow(Math.random(), randomnessPower) * ((Math.random() < 0.5 ? 1 : -1)) / altitude
-    const randomZ = Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1)
+    // Attempt to make stars further from the centre be less random, got the contratry effect
+    const altitude = ((Math.random() - 0.5) * (radius * 0.5))
+
+    const randomPowerX = Math.pow(Math.random(), randomnessPower) 
+    const randomPowerZ = Math.pow(Math.random(), randomnessPower)
+    const randomPowerY = Math.pow(Math.random(), (randomnessPower * radius)) * altitude 
+    
+
+    const randomX = randomPowerX * (Math.random() < 0.5 ? 1 : -1)
+    const randomY = randomPowerY * (Math.random() < 0.5 ? 1 : -1)
+    const randomZ = randomPowerZ * (Math.random() < 0.5 ? 1 : -1) 
 
     return { randomX, randomY, randomZ }
 }
@@ -272,7 +279,7 @@ const generateGalaxy = () => {
 
         // This is just for one vertex
         positions[vertexParticleX] = fillPositionX(branchAngleWithSpin, radiusRandomX)
-        positions[vertexParticleY] = randomY
+        positions[vertexParticleY] = randomY  
         positions[vertexParticleZ] = fillPositionZ(branchAngleWithSpin, radiusRandomZ)
 
         const mixedColor = mixColors(parameters, randomCoordsInRadius)
