@@ -1,0 +1,12 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\bundler",
+    "\\src",
+    "\\src\\shaders",
+    "\\src\\shaders\\test",
+    "\\static\\textures"
+  ],
+  "SelectedNode": "\\bundler\\webpack.common.js",
+  "PreviewInSolutionExplorer": false
+}
