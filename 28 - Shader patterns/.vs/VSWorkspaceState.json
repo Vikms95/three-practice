@@ -1,11 +1,10 @@
 {
   "ExpandedNodes": [
     "",
-    "\\bundler",
     "\\src",
     "\\src\\shaders",
     "\\src\\shaders\\test"
   ],
-  "SelectedNode": "\\src\\shaders\\test\\vertex.glsl",
+  "SelectedNode": "\\static",
   "PreviewInSolutionExplorer": false
 }

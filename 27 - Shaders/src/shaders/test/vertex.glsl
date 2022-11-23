@@ -13,7 +13,7 @@ uniform mat4 viewMatrix;
 uniform mat4 modelMatrix;
 
 // You can erase the view matrix and have a mix between View and Model.
-// ºuniform mat4 modelViewMatrix;
+// uniform mat4 modelViewMatrix;
 
 // Different between each vertex. Contains the x,y,z coordinates of each value  
 attribute vec3 position;
