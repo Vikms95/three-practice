@@ -1,0 +1,10 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\src",
+    "\\src\\shaders",
+    "\\src\\shaders\\water"
+  ],
+  "SelectedNode": "\\src\\shaders\\water\\fragment.glsl",
+  "PreviewInSolutionExplorer": false
+}
